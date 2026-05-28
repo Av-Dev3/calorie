@@ -6,7 +6,7 @@ const DEFAULT_STATE = {
     age: null,
     gender: 'other',
     height: null,
-    heightUnit: 'in',
+    heightUnit: 'imperial',
     activityLevel: 'moderate',
   },
   settings: {
@@ -167,7 +167,7 @@ export function calculateTDEE(profile, state) {
     weightKg = latestWeight.unit === 'kg' ? latestWeight.weight : latestWeight.weight * 0.453592;
   }
 
-  const heightCm = heightUnit === 'cm' ? height : height * 2.54;
+  const heightCm = heightToCm(height, heightUnit) ?? 0;
 
   let bmr;
   if (gender === 'male') {
@@ -187,6 +187,30 @@ export function calculateTDEE(profile, state) {
   };
 
   return Math.round(bmr * (multipliers[activityLevel] || 1.55));
+}
+
+export function heightToCm(height, heightUnit) {
+  if (!height) return null;
+  const unit = heightUnit === 'cm' ? 'cm' : 'imperial';
+  return unit === 'cm' ? height : height * 2.54;
+}
+
+export function inchesToFtIn(totalInches) {
+  if (!totalInches && totalInches !== 0) return { ft: '', in: '' };
+  const ft = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return { ft, in: inches === 12 ? 0 : inches };
+}
+
+export function ftInToInches(ft, inches) {
+  const f = parseInt(ft) || 0;
+  const i = parseInt(inches) || 0;
+  if (f === 0 && i === 0) return null;
+  return f * 12 + i;
+}
+
+export function normalizeHeightUnit(unit) {
+  return unit === 'cm' ? 'cm' : 'imperial';
 }
 
 export function getLatestWeight(state) {

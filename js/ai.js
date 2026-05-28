@@ -1,3 +1,9 @@
+export const AI_MODEL_PRESETS = [
+  { id: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash' },
+  { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+  { id: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+];
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const NUTRITION_PROMPT = `You are a nutrition label reader. Analyze this food label image and extract nutrition information.

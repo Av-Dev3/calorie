@@ -16,8 +16,11 @@ import {
   removeWorkoutEntry,
   addWeightEntry,
   saveState,
+  inchesToFtIn,
+  ftInToInches,
+  normalizeHeightUnit,
 } from './storage.js';
-import { scanFoodLabel, fileToBase64, compressImage } from './ai.js';
+import { scanFoodLabel, fileToBase64, compressImage, AI_MODEL_PRESETS } from './ai.js';
 import { initReports, setReportWeekEnd, shiftReportWeek, renderReportsView } from './reports.js';
 import { initCoach, setCoachDate, renderCoachView } from './coach.js';
 
@@ -523,6 +526,9 @@ function renderMeasurementsForm() {
 function renderProfileView() {
   const form = document.getElementById('profileForm');
   const p = state.profile;
+  const heightUnit = normalizeHeightUnit(p.heightUnit);
+  const { ft, in: inches } =
+    heightUnit === 'cm' ? { ft: '', in: '' } : inchesToFtIn(p.height);
 
   form.innerHTML = `
     <label class="field">
@@ -543,19 +549,27 @@ function renderProfileView() {
         </select>
       </label>
     </div>
-    <div class="form-row">
+    <label class="field">
+      <span>Height format</span>
+      <select id="profileHeightUnit">
+        <option value="imperial" ${heightUnit === 'imperial' ? 'selected' : ''}>Feet & inches</option>
+        <option value="cm" ${heightUnit === 'cm' ? 'selected' : ''}>Centimeters</option>
+      </select>
+    </label>
+    <div id="heightImperialFields" class="form-row ${heightUnit === 'cm' ? 'hidden' : ''}">
       <label class="field">
-        <span>Height</span>
-        <input type="number" id="profileHeight" value="${p.height || ''}" step="0.1" placeholder="Height">
+        <span>Feet</span>
+        <input type="number" id="profileHeightFt" value="${ft !== '' ? ft : ''}" min="0" max="8" placeholder="5">
       </label>
       <label class="field">
-        <span>Unit</span>
-        <select id="profileHeightUnit">
-          <option value="in" ${p.heightUnit === 'in' ? 'selected' : ''}>inches</option>
-          <option value="cm" ${p.heightUnit === 'cm' ? 'selected' : ''}>cm</option>
-        </select>
+        <span>Inches</span>
+        <input type="number" id="profileHeightIn" value="${inches !== '' ? inches : ''}" min="0" max="11" placeholder="10">
       </label>
     </div>
+    <label class="field ${heightUnit === 'cm' ? '' : 'hidden'}" id="heightCmField">
+      <span>Height (cm)</span>
+      <input type="number" id="profileHeightCm" value="${heightUnit === 'cm' ? p.height || '' : ''}" min="1" max="300" step="0.1" placeholder="175">
+    </label>
     <label class="field">
       <span>Activity Level</span>
       <select id="profileActivity">
@@ -568,21 +582,67 @@ function renderProfileView() {
     </label>
     <button type="submit" class="btn btn-primary">Save Profile</button>`;
 
+  const unitSelect = document.getElementById('profileHeightUnit');
+  unitSelect.addEventListener('change', toggleHeightFields);
+
   form.onsubmit = (e) => {
     e.preventDefault();
     state.profile.name = document.getElementById('profileName').value;
     state.profile.age = parseInt(document.getElementById('profileAge').value) || null;
     state.profile.gender = document.getElementById('profileGender').value;
-    state.profile.height = parseFloat(document.getElementById('profileHeight').value) || null;
-    state.profile.heightUnit = document.getElementById('profileHeightUnit').value;
+    state.profile.heightUnit = unitSelect.value;
+
+    if (state.profile.heightUnit === 'cm') {
+      state.profile.height = parseFloat(document.getElementById('profileHeightCm').value) || null;
+    } else {
+      state.profile.height = ftInToInches(
+        document.getElementById('profileHeightFt').value,
+        document.getElementById('profileHeightIn').value
+      );
+    }
+
     state.profile.activityLevel = document.getElementById('profileActivity').value;
     saveState(state);
     showToast('Profile saved');
     onUpdate?.();
   };
 
+  renderAISettingsForm();
+}
+
+function toggleHeightFields() {
+  const unit = document.getElementById('profileHeightUnit').value;
+  document.getElementById('heightImperialFields')?.classList.toggle('hidden', unit === 'cm');
+  document.getElementById('heightCmField')?.classList.toggle('hidden', unit !== 'cm');
+}
+
+function renderAISettingsForm() {
+  const presetSelect = document.getElementById('aiModelPreset');
+  const customField = document.getElementById('aiModelCustomField');
+  const customInput = document.getElementById('aiModelCustom');
+  if (!presetSelect) return;
+
+  const savedModel = state.settings.aiModel || AI_MODEL_PRESETS[0].id;
+  const isPreset = AI_MODEL_PRESETS.some((m) => m.id === savedModel);
+
+  presetSelect.innerHTML =
+    AI_MODEL_PRESETS.map(
+      (m) => `<option value="${m.id}" ${savedModel === m.id ? 'selected' : ''}>${m.label}</option>`
+    ).join('') + `<option value="custom" ${!isPreset ? 'selected' : ''}>Custom model…</option>`;
+
+  if (customInput) {
+    customInput.value = isPreset ? '' : savedModel;
+  }
+
+  customField?.classList.toggle('hidden', isPreset);
+
+  presetSelect.onchange = () => {
+    const isCustom = presetSelect.value === 'custom';
+    customField?.classList.toggle('hidden', !isCustom);
+    if (isCustom) customInput?.focus();
+  };
+
   document.getElementById('openrouterKey').value = state.settings.openrouterKey;
-  document.getElementById('aiModel').value = state.settings.aiModel;
 }
 
 function renderEntryList(entries, type) {
@@ -957,9 +1017,19 @@ export function handleWeightLog(e) {
 
 export function handleAISettings(e) {
   e.preventDefault();
+  const preset = document.getElementById('aiModelPreset').value;
+  const custom = document.getElementById('aiModelCustom').value.trim();
+
   state.settings.openrouterKey = document.getElementById('openrouterKey').value.trim();
-  state.settings.aiModel = document.getElementById('aiModel').value;
+  state.settings.aiModel = preset === 'custom' ? custom : preset;
+
+  if (!state.settings.aiModel) {
+    showToast('Enter a model ID or pick a preset', 'error');
+    return;
+  }
+
   saveState(state);
+  renderAISettingsForm();
   renderCoachView();
   showToast('AI settings saved', 'success');
 }

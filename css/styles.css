@@ -502,6 +502,11 @@ body {
   font-weight: 400;
 }
 
+.field.hidden,
+.form-row.hidden {
+  display: none;
+}
+
 .calorie-ring {
   position: relative;
   width: 160px;

@@ -265,13 +265,12 @@
               <input type="password" id="openrouterKey" placeholder="sk-or-v1-..." autocomplete="off">
             </label>
             <label class="field">
-              <span>Vision Model</span>
-              <select id="aiModel">
-                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
-                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                <option value="google/gemini-flash-1.5">Gemini Flash 1.5</option>
-              </select>
+              <span>Model</span>
+              <select id="aiModelPreset"></select>
+            </label>
+            <label class="field hidden" id="aiModelCustomField">
+              <span>Custom model ID</span>
+              <input type="text" id="aiModelCustom" placeholder="provider/model-name" autocomplete="off">
             </label>
             <button type="submit" class="btn btn-primary">Save AI Settings</button>
           </form>
