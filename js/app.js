@@ -2,6 +2,8 @@ import {
   loadState,
   saveState,
   getDateKey,
+  getMsUntilMidnight,
+  isToday,
   exportData,
   clearAllData,
 } from './storage.js';
@@ -24,18 +26,68 @@ import {
 
 let state = loadState();
 let currentDate = getDateKey();
+let followToday = true;
+let midnightTimer = null;
 
 function refresh() {
   renderAll();
 }
 
+function syncDatePicker() {
+  const hiddenDate = document.getElementById('hiddenDateInput');
+  if (!hiddenDate) return;
+  hiddenDate.value = currentDate;
+  hiddenDate.max = getDateKey();
+}
+
+function applyCurrentDate(dateKey, { notify = false } = {}) {
+  currentDate = dateKey;
+  followToday = isToday(dateKey);
+  syncDatePicker();
+  setCurrentDate(dateKey);
+  if (notify) {
+    showToast('New day — your log starts fresh', 'success');
+  }
+}
+
+function rollToToday({ notify = false } = {}) {
+  const today = getDateKey();
+  if (currentDate === today && followToday) {
+    scheduleMidnightRollover();
+    return;
+  }
+  if (followToday) {
+    applyCurrentDate(today, { notify });
+  }
+  scheduleMidnightRollover();
+}
+
+function scheduleMidnightRollover() {
+  clearTimeout(midnightTimer);
+  midnightTimer = setTimeout(() => rollToToday({ notify: true }), getMsUntilMidnight());
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState !== 'visible') return;
+  const today = getDateKey();
+  if (followToday && currentDate !== today) {
+    applyCurrentDate(today, { notify: true });
+  }
+  scheduleMidnightRollover();
+}
+
 function init() {
+  currentDate = getDateKey();
+  followToday = true;
   initUI(state, currentDate, refresh);
   bindNavigation();
   bindHeader();
   bindActions();
   bindModals();
   bindFileInputs();
+  syncDatePicker();
+  scheduleMidnightRollover();
+  document.addEventListener('visibilitychange', onVisibilityChange);
   renderAll();
 }
 
@@ -51,14 +103,12 @@ function bindHeader() {
   const dateBtn = document.getElementById('datePickerBtn');
   const hiddenDate = document.getElementById('hiddenDateInput');
 
-  hiddenDate.value = currentDate;
-  hiddenDate.max = getDateKey();
+  syncDatePicker();
 
   dateBtn.addEventListener('click', () => hiddenDate.showPicker?.() || hiddenDate.click());
 
   hiddenDate.addEventListener('change', () => {
-    currentDate = hiddenDate.value;
-    setCurrentDate(currentDate);
+    applyCurrentDate(hiddenDate.value);
   });
 }
 
@@ -83,7 +133,11 @@ function bindActions() {
     if (confirm('This will permanently delete all your data. Are you sure?')) {
       clearAllData();
       state = loadState();
+      currentDate = getDateKey();
+      followToday = true;
       initUI(state, currentDate, refresh);
+      syncDatePicker();
+      scheduleMidnightRollover();
       refresh();
       showToast('All data cleared', 'success');
     }

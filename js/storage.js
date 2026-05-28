@@ -58,7 +58,25 @@ export function saveState(state) {
 
 export function getDateKey(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getYesterdayKey(from = new Date()) {
+  const d = new Date(from);
+  d.setDate(d.getDate() - 1);
+  return getDateKey(d);
+}
+
+export function getMsUntilMidnight(from = new Date()) {
+  const midnight = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1, 0, 0, 0, 0);
+  return Math.max(midnight.getTime() - from.getTime(), 1000);
+}
+
+export function isToday(dateKey) {
+  return dateKey === getDateKey();
 }
 
 export function getEntriesForDate(state, dateKey) {
@@ -321,7 +339,7 @@ export function formatShortDay(dateKey) {
 export function formatDateDisplay(dateKey) {
   const d = new Date(dateKey + 'T12:00:00');
   const today = getDateKey();
-  const yesterday = getDateKey(new Date(Date.now() - 86400000));
+  const yesterday = getYesterdayKey();
 
   if (dateKey === today) return 'Today';
   if (dateKey === yesterday) return 'Yesterday';

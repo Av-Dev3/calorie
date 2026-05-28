@@ -19,6 +19,7 @@ import {
   inchesToFtIn,
   ftInToInches,
   normalizeHeightUnit,
+  isToday,
 } from './storage.js';
 import { scanFoodLabel, fileToBase64, compressImage, AI_MODEL_PRESETS } from './ai.js';
 import { initReports, setReportWeekEnd, shiftReportWeek, renderReportsView } from './reports.js';
@@ -58,7 +59,9 @@ export { shiftReportWeek };
 
 function updateDateDisplay() {
   const el = document.getElementById('dateDisplay');
-  if (el) el.textContent = formatDateDisplay(currentDate);
+  if (!el) return;
+  const label = formatDateDisplay(currentDate);
+  el.textContent = isToday(currentDate) ? label : `${label} · entries save to this day`;
 }
 
 function renderDashboard() {
