@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>CalorieTrack Pro</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-inner">
+        <h1 class="logo">CalorieTrack<span>Pro</span></h1>
+        <button class="icon-btn" id="datePickerBtn" aria-label="Select date">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </button>
+      </div>
+      <p class="date-display" id="dateDisplay"></p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main" id="mainContent">
+      <!-- Dashboard View -->
+      <section class="view active" id="view-dashboard" data-view="dashboard">
+        <div class="over-goal-banner hidden" id="overGoalBanner"></div>
+
+        <div class="calorie-ring-card" id="calorieRingCard">
+          <div class="calorie-ring" id="calorieRing">
+            <svg viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="52"/>
+              <circle class="ring-progress" id="calorieRingProgress" cx="60" cy="60" r="52"/>
+            </svg>
+            <div class="ring-center">
+              <span class="ring-value" id="caloriesRemaining">0</span>
+              <span class="ring-label" id="calorieRingLabel">remaining</span>
+            </div>
+          </div>
+          <div class="calorie-stats">
+            <div class="stat"><span class="stat-value" id="caloriesConsumed">0</span><span class="stat-label">eaten</span></div>
+            <div class="stat"><span class="stat-value" id="caloriesBurned">0</span><span class="stat-label">burned</span></div>
+            <div class="stat"><span class="stat-value" id="caloriesGoal">0</span><span class="stat-label">goal</span></div>
+          </div>
+        </div>
+
+        <div class="macro-grid" id="macroGrid"></div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Today's Meals</h2>
+            <button class="text-btn" id="addFoodBtn">+ Add Food</button>
+          </div>
+          <div class="meal-list" id="mealList"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Today's Workouts</h2>
+            <button class="text-btn" id="addWorkoutBtn">+ Add Workout</button>
+          </div>
+          <div class="workout-list" id="workoutList"></div>
+        </div>
+
+        <div class="card">
+          <h2>Weight Progress</h2>
+          <div class="weight-progress" id="weightProgress"></div>
+        </div>
+      </section>
+
+      <!-- Food View -->
+      <section class="view" id="view-food" data-view="food">
+        <div class="view-header">
+          <h2>Food Log</h2>
+          <p class="subtitle">Track everything you eat</p>
+        </div>
+        <div class="action-cards">
+          <button class="action-card" id="scanLabelBtn">
+            <div class="action-icon ai">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+            <span>Scan Label</span>
+            <small>AI reads nutrition facts</small>
+          </button>
+          <button class="action-card" id="manualFoodBtn">
+            <div class="action-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <span>Add Manually</span>
+            <small>Enter nutrition info</small>
+          </button>
+          <button class="action-card" id="quickAddBtn">
+            <div class="action-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <span>Quick Add</span>
+            <small>Calories only</small>
+          </button>
+        </div>
+        <div class="card">
+          <h3>Recent Foods</h3>
+          <div id="recentFoods"></div>
+        </div>
+        <div class="card">
+          <h3>All Entries Today</h3>
+          <div id="allFoodEntries"></div>
+        </div>
+      </section>
+
+      <!-- Workout View -->
+      <section class="view" id="view-workout" data-view="workout">
+        <div class="view-header">
+          <h2>Workouts</h2>
+          <p class="subtitle">Track exercise & calories burned</p>
+        </div>
+        <div class="workout-summary" id="workoutSummary"></div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Today's Sessions</h3>
+            <button class="text-btn" id="newWorkoutBtn">+ New Workout</button>
+          </div>
+          <div id="allWorkoutEntries"></div>
+        </div>
+        <div class="card">
+          <h3>Quick Add</h3>
+          <div class="quick-workouts" id="quickWorkouts"></div>
+        </div>
+        <div class="card">
+          <h3>Weekly Activity</h3>
+          <div class="weekly-chart" id="weeklyChart"></div>
+        </div>
+      </section>
+
+      <!-- Goals View -->
+      <section class="view" id="view-goals" data-view="goals">
+        <div class="view-header">
+          <h2>Goals</h2>
+          <p class="subtitle">Set targets & track progress</p>
+        </div>
+        <div class="card">
+          <h3>Weight Goal</h3>
+          <div id="weightGoalSection"></div>
+        </div>
+        <div class="card">
+          <h3>Daily Nutrition Targets</h3>
+          <form id="nutritionGoalsForm" class="form-grid"></form>
+        </div>
+        <div class="card">
+          <h3>Log Weight</h3>
+          <form id="weightLogForm" class="inline-form">
+            <input type="number" id="weightInput" step="0.1" min="1" placeholder="Weight" required>
+            <select id="weightUnit">
+              <option value="lbs">lbs</option>
+              <option value="kg">kg</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Log</button>
+          </form>
+          <div class="weight-history" id="weightHistory"></div>
+        </div>
+        <div class="card">
+          <h3>Body Measurements</h3>
+          <form id="measurementsForm" class="form-grid"></form>
+        </div>
+      </section>
+
+      <!-- Reports View -->
+      <section class="view" id="view-reports" data-view="reports">
+        <div class="view-header">
+          <h2>Weekly Reports</h2>
+          <p class="subtitle">Charts, trends & goal tracking</p>
+        </div>
+
+        <div class="week-picker">
+          <button class="icon-btn" id="reportWeekPrev" aria-label="Previous week">‹</button>
+          <span class="week-picker-label" id="reportWeekLabel"></span>
+          <button class="icon-btn" id="reportWeekNext" aria-label="Next week">›</button>
+        </div>
+
+        <div class="report-summary" id="reportSummary"></div>
+
+        <div class="card">
+          <h3>Daily Calories</h3>
+          <div id="reportCalorieChart"></div>
+        </div>
+
+        <div class="card">
+          <h3>Macro Averages</h3>
+          <div id="reportMacroChart"></div>
+        </div>
+
+        <div class="card">
+          <h3>Net Calories</h3>
+          <div id="reportNetChart"></div>
+        </div>
+
+        <div class="card">
+          <h3>Over Goal Days</h3>
+          <div id="reportOverGoalList"></div>
+        </div>
+
+        <div class="card">
+          <h3>Daily Breakdown</h3>
+          <div class="report-breakdown-header">
+            <span>Day</span>
+            <span>Eaten</span>
+            <span>Burned</span>
+            <span>Status</span>
+          </div>
+          <div id="reportDailyBreakdown"></div>
+        </div>
+      </section>
+
+      <!-- Coach View -->
+      <section class="view coach-view" id="view-coach" data-view="coach">
+        <div class="coach-header">
+          <div>
+            <h2>AI Coach</h2>
+            <p class="subtitle">Chat, log food & workouts, get advice</p>
+          </div>
+          <button class="icon-btn" id="coachClearBtn" aria-label="Clear chat" title="Clear chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+
+        <div class="coach-api-warning hidden" id="coachApiWarning">
+          Add your OpenRouter API key in <strong>Profile → AI Settings</strong> to use the coach.
+        </div>
+
+        <div class="coach-prompts" id="coachPrompts"></div>
+        <div class="coach-messages" id="coachMessages"></div>
+
+        <div class="coach-composer">
+          <div class="coach-image-preview hidden" id="coachImagePreview"></div>
+          <div class="coach-input-row">
+            <button class="icon-btn coach-attach-btn" id="coachAttachBtn" aria-label="Attach photo">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+            <textarea id="coachInput" rows="1" placeholder="Ask anything or say 'log my lunch...'"></textarea>
+            <button class="btn btn-primary coach-send-btn" id="coachSendBtn">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Profile/Settings View -->
+      <section class="view" id="view-profile" data-view="profile">
+        <div class="view-header">
+          <h2>Profile</h2>
+          <p class="subtitle">Personal info & settings</p>
+        </div>
+        <div class="card">
+          <h3>Personal Info</h3>
+          <form id="profileForm" class="form-grid"></form>
+        </div>
+        <div class="card">
+          <h3>AI Settings (OpenRouter)</h3>
+          <p class="hint">Required for AI Coach, label scanning, and photo analysis.</p>
+          <form id="aiSettingsForm" class="form-grid">
+            <label class="field">
+              <span>API Key</span>
+              <input type="password" id="openrouterKey" placeholder="sk-or-v1-..." autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Vision Model</span>
+              <select id="aiModel">
+                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                <option value="google/gemini-flash-1.5">Gemini Flash 1.5</option>
+              </select>
+            </label>
+            <button type="submit" class="btn btn-primary">Save AI Settings</button>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Data</h3>
+          <div class="data-actions">
+            <button class="btn btn-secondary" id="exportDataBtn">Export Data</button>
+            <button class="btn btn-danger" id="clearDataBtn">Clear All Data</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" id="bottomNav">
+      <button class="nav-item active" data-nav="dashboard">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-item" data-nav="food">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        <span>Food</span>
+      </button>
+      <button class="nav-item" data-nav="coach">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Coach</span>
+      </button>
+      <button class="nav-item" data-nav="workout">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 6.5L3 3"/><path d="M17.5 6.5L21 3"/><path d="M6.5 17.5L3 21"/><path d="M17.5 17.5L21 21"/></svg>
+        <span>Workout</span>
+      </button>
+      <button class="nav-item" data-nav="goals">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        <span>Goals</span>
+      </button>
+      <button class="nav-item" data-nav="reports">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Reports</span>
+      </button>
+      <button class="nav-item" data-nav="profile">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Profile</span>
+      </button>
+    </nav>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <h3 id="modalTitle">Modal</h3>
+          <button class="icon-btn modal-close" id="modalClose">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="labelCameraInput" accept="image/*" capture="environment" hidden>
+    <input type="file" id="labelFileInput" accept="image/*" hidden>
+    <input type="file" id="coachImageInput" accept="image/*" hidden>
+    <input type="date" id="hiddenDateInput" hidden>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
