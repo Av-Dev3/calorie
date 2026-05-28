@@ -22,15 +22,19 @@ import {
   handleWeightLog,
   handleAISettings,
   shiftReportWeek,
+  bindEntryDeleteHandlers,
+  updateTodayButton,
 } from './ui.js';
 
 let state = loadState();
 let currentDate = getDateKey();
 let followToday = true;
 let midnightTimer = null;
+let dayCheckTimer = null;
 
 function refresh() {
   renderAll();
+  updateTodayButton(currentDate);
 }
 
 function syncDatePicker() {
@@ -40,26 +44,49 @@ function syncDatePicker() {
   hiddenDate.max = getDateKey();
 }
 
-function applyCurrentDate(dateKey, { notify = false } = {}) {
+function markKnownDay(dateKey) {
+  state.settings.lastKnownDay = dateKey;
+  saveState(state);
+}
+
+function applyCurrentDate(dateKey, { notify = false, userSelected = false } = {}) {
   currentDate = dateKey;
-  followToday = isToday(dateKey);
+  followToday = userSelected ? isToday(dateKey) : true;
+  if (isToday(dateKey)) {
+    markKnownDay(dateKey);
+  }
   syncDatePicker();
   setCurrentDate(dateKey);
+  updateTodayButton(dateKey);
   if (notify) {
     showToast('New day — your log starts fresh', 'success');
   }
 }
 
-function rollToToday({ notify = false } = {}) {
+function goToToday() {
+  applyCurrentDate(getDateKey(), { userSelected: false });
+}
+
+function checkDayChange({ notify = false } = {}) {
   const today = getDateKey();
-  if (currentDate === today && followToday) {
+  const dayChanged = state.settings.lastKnownDay != null && state.settings.lastKnownDay !== today;
+
+  if (dayChanged) {
+    applyCurrentDate(today, { notify: true });
     scheduleMidnightRollover();
-    return;
+    return true;
   }
-  if (followToday) {
+
+  if (followToday && currentDate !== today) {
     applyCurrentDate(today, { notify });
   }
+
   scheduleMidnightRollover();
+  return false;
+}
+
+function rollToToday({ notify = false } = {}) {
+  checkDayChange({ notify });
 }
 
 function scheduleMidnightRollover() {
@@ -68,26 +95,39 @@ function scheduleMidnightRollover() {
 }
 
 function onVisibilityChange() {
-  if (document.visibilityState !== 'visible') return;
-  const today = getDateKey();
-  if (followToday && currentDate !== today) {
-    applyCurrentDate(today, { notify: true });
+  if (document.visibilityState === 'visible') {
+    checkDayChange({ notify: true });
   }
-  scheduleMidnightRollover();
+}
+
+function initDayTracking() {
+  const today = getDateKey();
+  const isNewDay = state.settings.lastKnownDay != null && state.settings.lastKnownDay !== today;
+
+  currentDate = today;
+  followToday = true;
+  markKnownDay(today);
+  syncDatePicker();
+  setCurrentDate(today);
+
+  if (isNewDay) {
+    setTimeout(() => showToast('New day — your log starts fresh', 'success'), 400);
+  }
 }
 
 function init() {
-  currentDate = getDateKey();
-  followToday = true;
+  initDayTracking();
   initUI(state, currentDate, refresh);
   bindNavigation();
   bindHeader();
   bindActions();
   bindModals();
   bindFileInputs();
-  syncDatePicker();
+  bindEntryDeleteHandlers(() => state, () => currentDate, refresh);
   scheduleMidnightRollover();
+  dayCheckTimer = setInterval(() => checkDayChange({ notify: true }), 30000);
   document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('focus', () => checkDayChange({ notify: true }));
   renderAll();
 }
 
@@ -102,13 +142,15 @@ function bindNavigation() {
 function bindHeader() {
   const dateBtn = document.getElementById('datePickerBtn');
   const hiddenDate = document.getElementById('hiddenDateInput');
+  const todayBtn = document.getElementById('goToTodayBtn');
 
   syncDatePicker();
 
   dateBtn.addEventListener('click', () => hiddenDate.showPicker?.() || hiddenDate.click());
+  todayBtn?.addEventListener('click', goToToday);
 
   hiddenDate.addEventListener('change', () => {
-    applyCurrentDate(hiddenDate.value);
+    applyCurrentDate(hiddenDate.value, { userSelected: true });
   });
 }
 
@@ -133,8 +175,7 @@ function bindActions() {
     if (confirm('This will permanently delete all your data. Are you sure?')) {
       clearAllData();
       state = loadState();
-      currentDate = getDateKey();
-      followToday = true;
+      initDayTracking();
       initUI(state, currentDate, refresh);
       syncDatePicker();
       scheduleMidnightRollover();

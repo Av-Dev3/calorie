@@ -13,6 +13,7 @@ const DEFAULT_STATE = {
     openrouterKey: '',
     aiModel: 'google/gemini-2.0-flash-001',
     weightUnit: 'lbs',
+    lastKnownDay: null,
   },
   goals: {
     calories: 2000,

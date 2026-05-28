@@ -44,6 +44,30 @@ export function setCurrentDate(dateKey) {
   renderAll();
 }
 
+export function updateTodayButton(dateKey) {
+  const btn = document.getElementById('goToTodayBtn');
+  if (btn) btn.classList.toggle('hidden', isToday(dateKey));
+}
+
+export function bindEntryDeleteHandlers(getState, getDateKey, onRefresh) {
+  document.getElementById('mainContent')?.addEventListener('click', (e) => {
+    const foodBtn = e.target.closest('[data-delete-food]');
+    if (foodBtn) {
+      removeFoodEntry(getState(), getDateKey(), foodBtn.dataset.deleteFood);
+      showToast('Food deleted', 'success');
+      onRefresh();
+      return;
+    }
+
+    const workoutBtn = e.target.closest('[data-delete-workout]');
+    if (workoutBtn) {
+      removeWorkoutEntry(getState(), getDateKey(), workoutBtn.dataset.deleteWorkout);
+      showToast('Workout deleted', 'success');
+      onRefresh();
+    }
+  });
+}
+
 export function renderAll() {
   renderDashboard();
   renderFoodView();
@@ -53,6 +77,7 @@ export function renderAll() {
   renderReportsView(state);
   renderCoachView();
   updateDateDisplay();
+  updateTodayButton(currentDate);
 }
 
 export { shiftReportWeek };
@@ -161,19 +186,12 @@ function renderMealList(food) {
           <div class="entry-meta">${e.mealType} · P:${e.protein || 0}g C:${e.carbs || 0}g F:${e.fat || 0}g</div>
         </div>
         <div class="entry-calories">${e.calories} cal</div>
-        <div class="entry-actions">
-          <button class="icon-btn danger btn-sm" data-delete-food="${e.id}" aria-label="Delete">×</button>
-        </div>
+        <button class="delete-entry-btn" data-delete-food="${e.id}" aria-label="Delete ${escapeHtml(e.name)}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
       </div>`
     )
     .join('');
-
-  el.querySelectorAll('[data-delete-food]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      removeFoodEntry(state, currentDate, btn.dataset.deleteFood);
-      onUpdate?.();
-    });
-  });
 }
 
 function renderWorkoutList(workouts) {
@@ -194,19 +212,12 @@ function renderWorkoutList(workouts) {
           <div class="entry-meta">${e.duration} min · ${formatTime(e.timestamp)}</div>
         </div>
         <div class="entry-calories burned">-${e.caloriesBurned} cal</div>
-        <div class="entry-actions">
-          <button class="icon-btn danger btn-sm" data-delete-workout="${e.id}" aria-label="Delete">×</button>
-        </div>
+        <button class="delete-entry-btn" data-delete-workout="${e.id}" aria-label="Delete ${escapeHtml(e.name)}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
       </div>`
     )
     .join('');
-
-  el.querySelectorAll('[data-delete-workout]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      removeWorkoutEntry(state, currentDate, btn.dataset.deleteWorkout);
-      onUpdate?.();
-    });
-  });
 }
 
 function renderWeightProgress() {
@@ -661,6 +672,9 @@ function renderEntryList(entries, type) {
             <div class="entry-meta">${e.mealType} · ${formatTime(e.timestamp)}</div>
           </div>
           <div class="entry-calories">${e.calories} cal</div>
+          <button class="delete-entry-btn" data-delete-food="${e.id}" aria-label="Delete ${escapeHtml(e.name)}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
         </div>`
       )
       .join('')}</div>`;
@@ -677,6 +691,9 @@ function renderEntryList(entries, type) {
           <div class="entry-meta">${e.duration} min · ${formatTime(e.timestamp)}</div>
         </div>
         <div class="entry-calories burned">-${e.caloriesBurned} cal</div>
+        <button class="delete-entry-btn" data-delete-workout="${e.id}" aria-label="Delete ${escapeHtml(e.name)}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
       </div>`
     )
     .join('')}</div>`;

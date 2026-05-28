@@ -77,6 +77,23 @@ body {
   justify-content: space-between;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#goToTodayBtn {
+  font-size: 0.8125rem;
+  padding: 6px 10px;
+  background: rgba(34, 197, 94, 0.12);
+  border-radius: var(--radius-sm);
+}
+
+#goToTodayBtn.hidden {
+  display: none;
+}
+
 .logo {
   font-size: 1.25rem;
   font-weight: 700;
@@ -700,6 +717,25 @@ body {
 .entry-actions {
   display: flex;
   gap: 4px;
+}
+
+.delete-entry-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.delete-entry-btn:active {
+  background: rgba(239, 68, 68, 0.25);
 }
 
 .empty-state {
