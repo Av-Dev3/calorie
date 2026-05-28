@@ -39,6 +39,7 @@ const DEFAULT_STATE = {
   workoutEntries: {},
   weightLog: [],
   recentFoods: [],
+  favoriteFoods: [],
   chatHistory: [],
 };
 
@@ -154,6 +155,66 @@ export function addToRecentFoods(state, food) {
     state.recentFoods.unshift(item);
   }
   if (state.recentFoods.length > 20) state.recentFoods.length = 20;
+}
+
+export function isFavoriteFood(state, name) {
+  if (!state.favoriteFoods?.length || !name) return false;
+  const key = name.toLowerCase();
+  return state.favoriteFoods.some((f) => f.name.toLowerCase() === key);
+}
+
+function normalizeFavoriteFood(food, existingId) {
+  return {
+    id: existingId || food.id || crypto.randomUUID(),
+    name: food.name || 'Food',
+    calories: Number(food.calories) || 0,
+    protein: Number(food.protein) || 0,
+    carbs: Number(food.carbs) || 0,
+    fat: Number(food.fat) || 0,
+    fiber: Number(food.fiber) || 0,
+    sugar: Number(food.sugar) || 0,
+    sodium: Number(food.sodium) || 0,
+    servingSize: food.servingSize || '',
+    servings: Number(food.servings) || 1,
+    mealType: food.mealType || 'snack',
+  };
+}
+
+export function addFavoriteFood(state, food) {
+  if (!state.favoriteFoods) state.favoriteFoods = [];
+  const item = normalizeFavoriteFood(food);
+  const existing = state.favoriteFoods.findIndex(
+    (f) => f.name.toLowerCase() === item.name.toLowerCase()
+  );
+  if (existing >= 0) {
+    item.id = state.favoriteFoods[existing].id;
+    state.favoriteFoods[existing] = item;
+  } else {
+    state.favoriteFoods.unshift(item);
+  }
+  if (state.favoriteFoods.length > 50) state.favoriteFoods.length = 50;
+  saveState(state);
+  return item;
+}
+
+export function updateFavoriteFood(state, id, food) {
+  if (!state.favoriteFoods) return null;
+  const idx = state.favoriteFoods.findIndex((f) => f.id === id);
+  if (idx < 0) return null;
+  const item = normalizeFavoriteFood({ ...state.favoriteFoods[idx], ...food }, id);
+  state.favoriteFoods[idx] = item;
+  saveState(state);
+  return item;
+}
+
+export function removeFavoriteFood(state, id) {
+  if (!state.favoriteFoods) return;
+  state.favoriteFoods = state.favoriteFoods.filter((f) => f.id !== id);
+  saveState(state);
+}
+
+export function getFavoriteFood(state, id) {
+  return state.favoriteFoods?.find((f) => f.id === id) || null;
 }
 
 export function calculateDailyTotals(foodEntries, workoutEntries) {

@@ -13,6 +13,7 @@ import {
   setCurrentDate,
   closeModal,
   showFoodModal,
+  showFavoriteFoodModal,
   showQuickAddModal,
   showWorkoutModal,
   showScanLabelModal,
@@ -159,6 +160,7 @@ function bindActions() {
   document.getElementById('addFoodBtn')?.addEventListener('click', () => showFoodModal());
   document.getElementById('addWorkoutBtn')?.addEventListener('click', () => showWorkoutModal());
   document.getElementById('manualFoodBtn')?.addEventListener('click', () => showFoodModal());
+  document.getElementById('addFavoriteFoodBtn')?.addEventListener('click', () => showFavoriteFoodModal());
   document.getElementById('quickAddBtn')?.addEventListener('click', () => showQuickAddModal());
   document.getElementById('scanLabelBtn')?.addEventListener('click', () => showScanLabelModal());
   document.getElementById('newWorkoutBtn')?.addEventListener('click', () => showWorkoutModal());

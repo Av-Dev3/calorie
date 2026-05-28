@@ -15,6 +15,11 @@ import {
   removeFoodEntry,
   removeWorkoutEntry,
   addWeightEntry,
+  addFavoriteFood,
+  removeFavoriteFood,
+  updateFavoriteFood,
+  getFavoriteFood,
+  isFavoriteFood,
   saveState,
   inchesToFtIn,
   ftInToInches,
@@ -261,25 +266,40 @@ function renderWeightProgress() {
 function renderFoodView() {
   const { food } = getEntriesForDate(state, currentDate);
 
+  renderFavoriteFoods();
+
   const recentEl = document.getElementById('recentFoods');
   if (!state.recentFoods.length) {
     recentEl.innerHTML = '<div class="empty-state">Your recent foods will appear here</div>';
   } else {
     recentEl.innerHTML = state.recentFoods
       .slice(0, 10)
-      .map(
-        (f, i) => `
+      .map((f, i) => {
+        const saved = isFavoriteFood(state, f.name);
+        return `
         <div class="recent-food-item" data-recent-index="${i}">
           <span class="name">${escapeHtml(f.name)}</span>
-          <span class="cals">${f.calories} cal</span>
-        </div>`
-      )
+          <span class="recent-food-actions">
+            <span class="cals">${f.calories} cal</span>
+            <button type="button" class="favorite-star-btn ${saved ? 'saved' : ''}" data-save-recent="${i}" aria-label="${saved ? 'Saved to My Foods' : 'Save to My Foods'}" title="${saved ? 'Saved' : 'Save to My Foods'}">★</button>
+          </span>
+        </div>`;
+      })
       .join('');
 
     recentEl.querySelectorAll('[data-recent-index]').forEach((item) => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('[data-save-recent]')) return;
         const foodData = state.recentFoods[parseInt(item.dataset.recentIndex)];
         showFoodModal(foodData);
+      });
+    });
+
+    recentEl.querySelectorAll('[data-save-recent]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const foodData = state.recentFoods[parseInt(btn.dataset.saveRecent)];
+        saveRecentToFavorites(foodData);
       });
     });
   }
@@ -289,6 +309,184 @@ function renderFoodView() {
     allEl.innerHTML = '<div class="empty-state">No food entries for this day</div>';
   } else {
     allEl.innerHTML = renderEntryList(food, 'food');
+  }
+}
+
+function renderFavoriteFoods() {
+  const el = document.getElementById('favoriteFoods');
+  if (!el) return;
+
+  if (!state.favoriteFoods?.length) {
+    el.innerHTML =
+      '<div class="empty-state">Add foods you eat regularly for one-tap logging</div>';
+    return;
+  }
+
+  el.innerHTML = state.favoriteFoods
+    .map(
+      (f) => `
+      <div class="favorite-food-item">
+        <button type="button" class="favorite-food-btn" data-log-favorite="${f.id}">
+          <strong>${MEAL_EMOJI[f.mealType] || '🍽️'} ${escapeHtml(f.name)}</strong>
+          <span>${f.calories} cal · P${Math.round(f.protein)} C${Math.round(f.carbs)} F${Math.round(f.fat)}</span>
+        </button>
+        <button type="button" class="favorite-food-edit" data-edit-favorite="${f.id}" aria-label="Edit ${escapeHtml(f.name)}">✎</button>
+      </div>`
+    )
+    .join('');
+
+  el.querySelectorAll('[data-log-favorite]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const favorite = getFavoriteFood(state, btn.dataset.logFavorite);
+      if (favorite) logFavoriteFood(favorite);
+    });
+  });
+
+  el.querySelectorAll('[data-edit-favorite]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const favorite = getFavoriteFood(state, btn.dataset.editFavorite);
+      if (favorite) showFavoriteFoodModal(favorite);
+    });
+  });
+}
+
+function logFavoriteFood(favorite) {
+  addFoodEntry(state, currentDate, {
+    name: favorite.name,
+    calories: favorite.calories,
+    protein: favorite.protein,
+    carbs: favorite.carbs,
+    fat: favorite.fat,
+    fiber: favorite.fiber,
+    sugar: favorite.sugar,
+    sodium: favorite.sodium,
+    servingSize: favorite.servingSize,
+    servings: favorite.servings,
+    mealType: favorite.mealType || getDefaultMealType(),
+  });
+  showToast(`Logged ${favorite.name}`, 'success');
+  onUpdate?.();
+}
+
+function saveRecentToFavorites(foodData) {
+  addFavoriteFood(state, {
+    ...foodData,
+    mealType: getDefaultMealType(),
+    servings: 1,
+  });
+  showToast(`${foodData.name} saved to My Foods`, 'success');
+  renderFoodView();
+}
+
+export function showFavoriteFoodModal(existing = null) {
+  let selectedMeal = existing?.mealType || getDefaultMealType();
+  const editing = !!existing?.id;
+
+  function renderForm() {
+    return `
+      <div class="meal-type-selector">
+        ${MEAL_TYPES.map(
+          (m) => `
+          <button type="button" class="meal-type-btn ${selectedMeal === m ? 'active' : ''}" data-meal="${m}">
+            ${MEAL_EMOJI[m]} ${m}
+          </button>`
+        ).join('')}
+      </div>
+      <p class="section-hint">Default meal type when you one-tap log this food</p>
+      <form id="favoriteFoodForm" class="form-grid">
+        <label class="field">
+          <span>Food Name</span>
+          <input type="text" id="favName" value="${escapeHtml(existing?.name || '')}" required placeholder="e.g. Protein shake">
+        </label>
+        <label class="field">
+          <span>Serving Size (optional)</span>
+          <input type="text" id="favServing" value="${escapeHtml(existing?.servingSize || '')}" placeholder="e.g. 1 scoop">
+        </label>
+        <div class="form-row">
+          <label class="field">
+            <span>Calories</span>
+            <input type="number" id="favCalories" value="${existing?.calories ?? ''}" min="0" required>
+          </label>
+          <label class="field">
+            <span>Protein (g)</span>
+            <input type="number" id="favProtein" value="${existing?.protein ?? ''}" min="0" step="0.1">
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span>Carbs (g)</span>
+            <input type="number" id="favCarbs" value="${existing?.carbs ?? ''}" min="0" step="0.1">
+          </label>
+          <label class="field">
+            <span>Fat (g)</span>
+            <input type="number" id="favFat" value="${existing?.fat ?? ''}" min="0" step="0.1">
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span>Fiber (g)</span>
+            <input type="number" id="favFiber" value="${existing?.fiber ?? ''}" min="0" step="0.1">
+          </label>
+          <label class="field">
+            <span>Sugar (g)</span>
+            <input type="number" id="favSugar" value="${existing?.sugar ?? ''}" min="0" step="0.1">
+          </label>
+        </div>
+        <label class="field">
+          <span>Sodium (mg)</span>
+          <input type="number" id="favSodium" value="${existing?.sodium ?? ''}" min="0">
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">${editing ? 'Save Changes' : 'Add to My Foods'}</button>
+        ${editing ? '<button type="button" class="btn btn-danger btn-block" id="deleteFavoriteBtn">Remove from My Foods</button>' : ''}
+      </form>`;
+  }
+
+  showModal(editing ? 'Edit My Food' : 'Add to My Foods', renderForm());
+  bindFavoriteFormEvents();
+
+  function bindFavoriteFormEvents() {
+    document.querySelectorAll('.meal-type-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        selectedMeal = btn.dataset.meal;
+        showModal(editing ? 'Edit My Food' : 'Add to My Foods', renderForm());
+        bindFavoriteFormEvents();
+      });
+    });
+
+    document.getElementById('deleteFavoriteBtn')?.addEventListener('click', () => {
+      if (!confirm(`Remove "${existing.name}" from My Foods?`)) return;
+      removeFavoriteFood(state, existing.id);
+      closeModal();
+      showToast('Removed from My Foods', 'success');
+      onUpdate?.();
+    });
+
+    document.getElementById('favoriteFoodForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('favName').value.trim(),
+        servingSize: document.getElementById('favServing').value.trim(),
+        calories: parseInt(document.getElementById('favCalories').value) || 0,
+        protein: parseFloat(document.getElementById('favProtein').value) || 0,
+        carbs: parseFloat(document.getElementById('favCarbs').value) || 0,
+        fat: parseFloat(document.getElementById('favFat').value) || 0,
+        fiber: parseFloat(document.getElementById('favFiber').value) || 0,
+        sugar: parseFloat(document.getElementById('favSugar').value) || 0,
+        sodium: parseInt(document.getElementById('favSodium').value) || 0,
+        mealType: selectedMeal,
+        servings: 1,
+      };
+
+      if (editing) {
+        updateFavoriteFood(state, existing.id, payload);
+        showToast('My Food updated', 'success');
+      } else {
+        addFavoriteFood(state, payload);
+        showToast('Added to My Foods', 'success');
+      }
+      closeModal();
+      onUpdate?.();
+    });
   }
 }
 
@@ -776,6 +974,10 @@ export function showFoodModal(prefill = {}) {
           <span>Sodium (mg)</span>
           <input type="number" id="foodSodium" value="${Math.round((data.sodium || 0) * mult)}" min="0">
         </label>
+        <label class="field checkbox-field">
+          <input type="checkbox" id="saveToFavorites">
+          <span>Save to My Foods for quick logging later</span>
+        </label>
         <button type="submit" class="btn btn-primary btn-block">Add Food</button>
       </form>`;
   }
@@ -806,7 +1008,7 @@ export function showFoodModal(prefill = {}) {
 
     document.getElementById('foodForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      addFoodEntry(state, currentDate, {
+      const entry = {
         name: document.getElementById('foodName').value,
         servingSize: document.getElementById('foodServing').value,
         servings,
@@ -818,7 +1020,21 @@ export function showFoodModal(prefill = {}) {
         fiber: parseFloat(document.getElementById('foodFiber').value) || 0,
         sugar: parseFloat(document.getElementById('foodSugar').value) || 0,
         sodium: parseInt(document.getElementById('foodSodium').value) || 0,
-      });
+      };
+      addFoodEntry(state, currentDate, entry);
+      if (document.getElementById('saveToFavorites')?.checked) {
+        addFavoriteFood(state, {
+          ...entry,
+          calories: Math.round(entry.calories / servings),
+          protein: entry.protein / servings,
+          carbs: entry.carbs / servings,
+          fat: entry.fat / servings,
+          fiber: entry.fiber / servings,
+          sugar: entry.sugar / servings,
+          sodium: Math.round(entry.sodium / servings),
+          servings: 1,
+        });
+      }
       closeModal();
       showToast('Food added!', 'success');
       onUpdate?.();
