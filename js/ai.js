@@ -1,10 +1,12 @@
 export const AI_MODEL_PRESETS = [
-  { id: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash' },
+  { id: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash (fastest)' },
   { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
   { id: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
 ];
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const COACH_TIMEOUT_MS = 45000;
+const COACH_MAX_HISTORY = 10;
 
 const NUTRITION_PROMPT = `You are a nutrition label reader. Analyze this food label image and extract nutrition information.
 
@@ -29,26 +31,31 @@ Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 Use per-serving values. If only per-container values are shown, divide by servings per container.
 If a value is not visible, use 0. Be precise with numbers.`;
 
-const COACH_SYSTEM_PROMPT = `You are CalorieTrack Pro AI Coach — a friendly, knowledgeable fitness and nutrition assistant built into a calorie tracking app.
+const COACH_SYSTEM_PROMPT = `You are CalorieTrack Pro AI Coach — a friendly fitness and nutrition assistant built into a calorie tracking app.
+
+## CRITICAL: Use saved app data
+The user has already logged food, workouts, and goals in the app. LIVE APP DATA is provided below.
+- When discussing the user's intake, progress, or remaining macros, use ONLY the exact numbers from LIVE APP DATA.
+- NEVER guess or invent what the user has eaten today — read mealsToday and the summary totals.
+- When stating calories eaten, remaining, net, or macros, quote the exact values from LIVE APP DATA.
+- If mealsToday is empty, say nothing is logged yet — do not assume they ate anything.
+- Only estimate macros when the user asks you to LOG new food that is not already in the app.
 
 ## Your capabilities
-1. **Advice**: Recommend foods, meals, and workouts based on the user's goals, profile, and today's progress.
-2. **Logging**: When the user asks you to log, add, or record food, workouts, or weight — include action blocks so the app saves it automatically.
-3. **Vision**: Analyze food photos, nutrition labels, meals, and estimate macros when images are provided.
-4. **Context-aware**: Use the user's current stats, goals, and history provided in USER_CONTEXT.
+1. **Advice**: Recommend foods, meals, and workouts based on goals and LIVE APP DATA.
+2. **Logging**: When the user asks to log/add/record food, workouts, or weight — include action blocks.
+3. **Vision**: Analyze food photos and estimate macros for NEW items to log.
+4. **Context-aware**: Always reference the user's actual logged data.
 
 ## Rules
-- Be concise, encouraging, and practical. Use bullet points for lists.
-- When logging data the user requested, ALWAYS include an actions block (see format below).
+- Be concise and practical. Use bullet points for lists.
+- When logging data the user requested, ALWAYS include an actions block.
 - When recommending (not logging), do NOT include actions unless the user says to log it.
-- Estimate reasonable macros for common foods when exact values aren't known.
-- For workouts, estimate calories burned based on duration and intensity.
 - mealType must be one of: breakfast, lunch, dinner, snack
-- Never provide medical diagnoses. Add a brief disclaimer for serious health questions.
-- If info is missing to log something, ask one clarifying question OR make a reasonable estimate and note it.
+- Never provide medical diagnoses.
 
 ## Action block format
-When logging data, append this block at the END of your response (user won't see it rendered as text):
+When logging data, append this block at the END of your response:
 
 \`\`\`actions
 [
@@ -65,8 +72,15 @@ Only include actions the user explicitly asked to log or clearly confirmed.`;
 export function buildCoachSystemMessage(context) {
   return `${COACH_SYSTEM_PROMPT}
 
-## USER_CONTEXT
+## LIVE APP DATA (authoritative — use these exact numbers)
+${context.summary}
+
+## Full data (JSON)
 ${JSON.stringify(context, null, 2)}`;
+}
+
+export function buildCoachUserPrefix(context) {
+  return `[My saved app data for ${context.date} — use these exact numbers when answering]\n${context.summary}\n\n`;
 }
 
 export async function scanFoodLabel(imageBase64, apiKey, model) {
@@ -74,24 +88,28 @@ export async function scanFoodLabel(imageBase64, apiKey, model) {
     throw new Error('OpenRouter API key is required. Add it in Profile settings.');
   }
 
-  const response = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: getHeaders(apiKey),
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: NUTRITION_PROMPT },
-            { type: 'image_url', image_url: { url: imageBase64 } },
-          ],
-        },
-      ],
-      max_tokens: 500,
-      temperature: 0.1,
-    }),
-  });
+  const response = await fetchWithTimeout(
+    OPENROUTER_URL,
+    {
+      method: 'POST',
+      headers: getHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: NUTRITION_PROMPT },
+              { type: 'image_url', image_url: { url: imageBase64 } },
+            ],
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.1,
+      }),
+    },
+    60000
+  );
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -105,26 +123,39 @@ export async function scanFoodLabel(imageBase64, apiKey, model) {
   return parseNutritionResponse(content);
 }
 
-export async function sendCoachMessage(apiKey, model, systemPrompt, chatMessages) {
+export async function sendCoachMessage(apiKey, model, systemPrompt, chatMessages, contextPrefix = '') {
   if (!apiKey) {
     throw new Error('OpenRouter API key is required. Add it in Profile settings.');
   }
 
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...chatMessages.map(formatMessageForApi),
-  ];
+  const trimmed = chatMessages.slice(-COACH_MAX_HISTORY);
+  const formatted = trimmed.map((msg, index) =>
+    formatMessageForApi(msg, index === trimmed.length - 1)
+  );
 
-  const response = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: getHeaders(apiKey),
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: 1500,
-      temperature: 0.7,
-    }),
-  });
+  if (contextPrefix && formatted.length > 0) {
+    const last = formatted[formatted.length - 1];
+    if (last.role === 'user') {
+      last.content = prependToUserContent(last.content, contextPrefix);
+    }
+  }
+
+  const messages = [{ role: 'system', content: systemPrompt }, ...formatted];
+
+  const response = await fetchWithTimeout(
+    OPENROUTER_URL,
+    {
+      method: 'POST',
+      headers: getHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: 900,
+        temperature: 0.4,
+      }),
+    },
+    COACH_TIMEOUT_MS
+  );
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -138,13 +169,30 @@ export async function sendCoachMessage(apiKey, model, systemPrompt, chatMessages
   return parseCoachResponse(content);
 }
 
-function formatMessageForApi(msg) {
-  if (msg.role === 'user' && msg.image) {
+function prependToUserContent(content, prefix) {
+  if (Array.isArray(content)) {
+    const textPart = content.find((p) => p.type === 'text');
+    if (textPart) {
+      textPart.text = prefix + textPart.text;
+      return content;
+    }
+    return [{ type: 'text', text: prefix }, ...content];
+  }
+  return prefix + content;
+}
+
+function formatMessageForApi(msg, isLatest) {
+  if (msg.role === 'user' && msg.image && isLatest) {
     const parts = [{ type: 'text', text: msg.content || 'Please analyze this image.' }];
     parts.push({ type: 'image_url', image_url: { url: msg.image } });
     return { role: 'user', content: parts };
   }
-  return { role: msg.role, content: msg.content };
+
+  let text = msg.content || '';
+  if (msg.role === 'user' && msg.image && !isLatest) {
+    text = `${text}\n[User previously attached a photo]`.trim();
+  }
+  return { role: msg.role, content: text };
 }
 
 export function parseCoachResponse(content) {
@@ -194,6 +242,22 @@ function parseNutritionResponse(content) {
   }
 }
 
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s. Try again or use a faster model (Gemini Flash).`);
+    }
+    throw new Error('Network error — check your connection and try again.');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function getHeaders(apiKey) {
   return {
     'Content-Type': 'application/json',
@@ -212,7 +276,7 @@ export function fileToBase64(file) {
   });
 }
 
-export function compressImage(base64, maxWidth = 1024) {
+export function compressImage(base64, maxWidth = 768) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -226,8 +290,9 @@ export function compressImage(base64, maxWidth = 1024) {
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      resolve(canvas.toDataURL('image/jpeg', 0.75));
     };
+    img.onerror = () => resolve(base64);
     img.src = base64;
   });
 }

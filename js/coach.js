@@ -5,6 +5,7 @@ import {
 } from './storage.js';
 import {
   buildCoachSystemMessage,
+  buildCoachUserPrefix,
   sendCoachMessage,
   fileToBase64,
   compressImage,
@@ -13,33 +14,35 @@ import {
 const QUICK_PROMPTS = [
   { label: 'Meal ideas', text: 'What should I eat for my next meal based on my remaining macros today?' },
   { label: 'Workout plan', text: 'Suggest a workout for today based on my goals and activity level.' },
-  { label: 'Weekly check-in', text: 'How am I doing this week? Give me an honest assessment.' },
+  { label: 'Weekly check-in', text: 'How am I doing this week? Give me an honest assessment using my logged data.' },
   { label: 'Log breakfast', text: 'I had eggs and toast for breakfast — please log it with estimated macros.' },
   { label: 'Over goal help', text: "I'm over my calorie goal today. What should I do for the rest of the day?" },
   { label: 'High protein', text: 'Suggest high-protein foods that fit my remaining calories today.' },
 ];
 
-let state = null;
-let currentDate = null;
+let getState = null;
+let getDateKey = null;
 let onUpdate = null;
 let pendingImage = null;
 let isSending = false;
 let eventsBound = false;
 
-export function initCoach(appState, dateKey, updateCallback) {
-  state = appState;
-  currentDate = dateKey;
+export function initCoach(getStateFn, getDateKeyFn, updateCallback) {
+  getState = getStateFn;
+  getDateKey = getDateKeyFn;
   onUpdate = updateCallback;
+  const state = getState();
   if (!state.chatHistory) state.chatHistory = [];
   bindCoachEvents();
   renderCoachView();
 }
 
-export function setCoachDate(dateKey) {
-  currentDate = dateKey;
+export function setCoachDate(_dateKey) {
+  renderCoachContextBar();
 }
 
 export function renderCoachView() {
+  renderCoachContextBar();
   renderPrompts();
   renderMessages();
   updatePendingImagePreview();
@@ -73,6 +76,33 @@ function bindCoachEvents() {
   });
 }
 
+function renderCoachContextBar() {
+  const el = document.getElementById('coachContextBar');
+  if (!el || !getState || !getDateKey) return;
+
+  const state = getState();
+  const context = getCoachContext(state, getDateKey());
+  const { today, goals } = context;
+
+  el.innerHTML = `
+    <div class="coach-context-stat">
+      <span class="coach-context-label">Eaten</span>
+      <span class="coach-context-value">${today.eaten}</span>
+    </div>
+    <div class="coach-context-stat">
+      <span class="coach-context-label">Remaining</span>
+      <span class="coach-context-value ${today.overGoal ? 'over' : ''}">${today.remainingCalories}</span>
+    </div>
+    <div class="coach-context-stat">
+      <span class="coach-context-label">Protein</span>
+      <span class="coach-context-value">${Math.round(today.protein)}/${goals.protein}g</span>
+    </div>
+    <div class="coach-context-stat">
+      <span class="coach-context-label">Meals</span>
+      <span class="coach-context-value">${context.mealsToday.length}</span>
+    </div>`;
+}
+
 function renderPrompts() {
   const el = document.getElementById('coachPrompts');
   if (!el) return;
@@ -91,14 +121,15 @@ function renderPrompts() {
 
 function renderMessages() {
   const el = document.getElementById('coachMessages');
-  if (!el) return;
+  if (!el || !getState) return;
 
+  const state = getState();
   if (!state.chatHistory.length) {
     el.innerHTML = `
       <div class="coach-welcome">
         <div class="coach-welcome-icon">🤖</div>
         <h3>Your AI Coach</h3>
-        <p>Ask for meal ideas, workout suggestions, or tell me to log food and workouts. Attach photos of meals or labels!</p>
+        <p>I can see your logged meals, workouts, and goals from the bar above. Ask for advice or tell me to log food!</p>
       </div>`;
     return;
   }
@@ -133,8 +164,10 @@ function renderMessages() {
 }
 
 async function sendUserMessage() {
-  if (isSending) return;
+  if (isSending || !getState || !getDateKey) return;
 
+  const state = getState();
+  const dateKey = getDateKey();
   const input = document.getElementById('coachInput');
   const text = input?.value.trim();
   if (!text && !pendingImage) return;
@@ -152,7 +185,7 @@ async function sendUserMessage() {
   };
 
   state.chatHistory.push(userMsg);
-  if (state.chatHistory.length > 100) state.chatHistory = state.chatHistory.slice(-100);
+  if (state.chatHistory.length > 50) state.chatHistory = state.chatHistory.slice(-50);
   saveState(state);
 
   input.value = '';
@@ -162,23 +195,25 @@ async function sendUserMessage() {
   setSending(true);
 
   try {
-    const context = getCoachContext(state, currentDate);
+    const context = getCoachContext(state, dateKey);
     const systemPrompt = buildCoachSystemMessage(context);
+    const contextPrefix = buildCoachUserPrefix(context);
+
     const apiMessages = state.chatHistory
       .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .slice(-20)
       .map(({ role, content, image }) => ({ role, content, image }));
 
     const { content, actions } = await sendCoachMessage(
       state.settings.openrouterKey,
       state.settings.aiModel,
       systemPrompt,
-      apiMessages
+      apiMessages,
+      contextPrefix
     );
 
     let actionsApplied = [];
     if (actions.length) {
-      actionsApplied = executeCoachActions(state, currentDate, actions);
+      actionsApplied = executeCoachActions(state, dateKey, actions);
     }
 
     state.chatHistory.push({
@@ -187,7 +222,14 @@ async function sendUserMessage() {
       actionsApplied,
       timestamp: Date.now(),
     });
+
+    if (userMsg.image) {
+      userMsg.image = null;
+      userMsg.hadImage = true;
+    }
+
     saveState(state);
+    renderCoachContextBar();
     renderMessages();
     onUpdate?.();
   } catch (err) {
@@ -201,7 +243,8 @@ async function sendUserMessage() {
 }
 
 function clearChat() {
-  if (!state.chatHistory.length) return;
+  const state = getState?.();
+  if (!state?.chatHistory.length) return;
   if (!confirm('Clear all chat history?')) return;
   state.chatHistory = [];
   saveState(state);
@@ -221,6 +264,7 @@ function setSending(sending) {
       'beforeend',
       `<div class="coach-msg assistant" id="coachTyping">
         <div class="coach-msg-bubble typing"><span></span><span></span><span></span></div>
+        <p class="coach-typing-hint">Reading your saved data & thinking…</p>
       </div>`
     );
     el.scrollTop = el.scrollHeight;
@@ -250,7 +294,8 @@ function updatePendingImagePreview() {
 
 function updateCoachApiWarning() {
   const el = document.getElementById('coachApiWarning');
-  if (!el) return;
+  const state = getState?.();
+  if (!el || !state) return;
   el.classList.toggle('hidden', !!state.settings.openrouterKey);
 }
 

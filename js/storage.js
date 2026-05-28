@@ -390,38 +390,86 @@ export function getCoachContext(state, dateKey) {
   const report = getWeeklyReport(state, dateKey);
   const latestWeight = getLatestWeight(state);
   const net = totals.calories - totals.burned;
+  const goals = state.goals;
 
-  return {
+  const today = {
+    eaten: totals.calories,
+    burned: totals.burned,
+    net,
+    remainingCalories: goals.calories - net,
+    overGoal: net > goals.calories,
+    protein: totals.protein,
+    carbs: totals.carbs,
+    fat: totals.fat,
+    proteinRemaining: goals.protein - totals.protein,
+    carbsRemaining: goals.carbs - totals.carbs,
+    fatRemaining: goals.fat - totals.fat,
+  };
+
+  const mealsToday = food.map((f) => ({
+    name: f.name,
+    calories: f.calories,
+    protein: f.protein || 0,
+    carbs: f.carbs || 0,
+    fat: f.fat || 0,
+    mealType: f.mealType,
+    servings: f.servings || 1,
+  }));
+
+  const workoutsToday = workouts.map((w) => ({
+    name: w.name,
+    duration: w.duration,
+    caloriesBurned: w.caloriesBurned,
+  }));
+
+  const context = {
     date: dateKey,
     profile: state.profile,
-    goals: state.goals,
-    today: {
-      eaten: totals.calories,
-      burned: totals.burned,
-      net,
-      remaining: state.goals.calories - net,
-      overGoal: net > state.goals.calories,
-      protein: totals.protein,
-      carbs: totals.carbs,
-      fat: totals.fat,
-    },
+    goals,
+    today,
     weekly: {
       avgCalories: report.avgCalories,
       daysOverGoal: report.daysOverGoal,
       onTargetDays: report.onTargetDays,
     },
     latestWeight: latestWeight ? { weight: latestWeight.weight, unit: latestWeight.unit } : null,
-    mealsToday: food.map((f) => ({
-      name: f.name,
-      calories: f.calories,
-      mealType: f.mealType,
-    })),
-    workoutsToday: workouts.map((w) => ({
-      name: w.name,
-      duration: w.duration,
-      caloriesBurned: w.caloriesBurned,
-    })),
+    mealsToday,
+    workoutsToday,
   };
+
+  context.summary = formatCoachContextSummary(context);
+  return context;
+}
+
+export function formatCoachContextSummary(context) {
+  const { date, goals, today, mealsToday, workoutsToday, latestWeight, weekly } = context;
+  const mealLines =
+    mealsToday.length > 0
+      ? mealsToday
+          .map(
+            (m) =>
+              `  - ${m.mealType}: ${m.name} — ${m.calories} cal (P${Math.round(m.protein)} C${Math.round(m.carbs)} F${Math.round(m.fat)})`
+          )
+          .join('\n')
+      : '  - (none logged yet)';
+  const workoutLines =
+    workoutsToday.length > 0
+      ? workoutsToday
+          .map((w) => `  - ${w.name}: ${w.duration} min, ${w.caloriesBurned} cal burned`)
+          .join('\n')
+      : '  - (none logged yet)';
+
+  return [
+    `Date: ${date}`,
+    `Calorie goal: ${goals.calories} | Eaten: ${today.eaten} | Burned: ${today.burned} | Net: ${today.net} | Remaining: ${today.remainingCalories}${today.overGoal ? ' (OVER GOAL)' : ''}`,
+    `Protein: ${Math.round(today.protein)}/${goals.protein}g (${Math.round(today.proteinRemaining)}g left)`,
+    `Carbs: ${Math.round(today.carbs)}/${goals.carbs}g (${Math.round(today.carbsRemaining)}g left)`,
+    `Fat: ${Math.round(today.fat)}/${goals.fat}g (${Math.round(today.fatRemaining)}g left)`,
+    `Meals logged:\n${mealLines}`,
+    `Workouts logged:\n${workoutLines}`,
+    latestWeight ? `Latest weight: ${latestWeight.weight} ${latestWeight.unit}` : 'Latest weight: not logged',
+    `This week: avg ${weekly.avgCalories} cal/day, ${weekly.daysOverGoal} days over goal`,
+  ].join('\n');
 }
 
 export function executeCoachActions(state, dateKey, actions) {

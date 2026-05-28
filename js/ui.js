@@ -34,7 +34,7 @@ export function initUI(appState, dateKey, updateCallback) {
   currentDate = dateKey;
   onUpdate = updateCallback;
   initReports(dateKey, () => onUpdate?.());
-  initCoach(appState, dateKey, updateCallback);
+  initCoach(() => state, () => currentDate, updateCallback);
 }
 
 export function setCurrentDate(dateKey) {

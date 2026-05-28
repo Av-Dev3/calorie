@@ -1510,6 +1510,56 @@ body {
   display: none;
 }
 
+.coach-context-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  margin-bottom: 4px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.coach-context-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.coach-context-stat {
+  flex: 0 0 auto;
+  min-width: 72px;
+  padding: 6px 10px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.coach-context-label {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.coach-context-value {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.coach-context-value.over {
+  color: var(--danger);
+}
+
+.coach-typing-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  text-align: center;
+}
+
 .coach-prompts {
   display: flex;
   gap: 8px;
