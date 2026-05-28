@@ -108,16 +108,17 @@ function initDayTracking() {
   followToday = true;
   markKnownDay(today);
   syncDatePicker();
-  setCurrentDate(today);
 
   if (isNewDay) {
     setTimeout(() => showToast('New day — your log starts fresh', 'success'), 400);
   }
+
+  return isNewDay;
 }
 
 function init() {
+  initUI(state, getDateKey(), refresh);
   initDayTracking();
-  initUI(state, currentDate, refresh);
   bindNavigation();
   bindHeader();
   bindActions();
@@ -128,7 +129,7 @@ function init() {
   dayCheckTimer = setInterval(() => checkDayChange({ notify: true }), 30000);
   document.addEventListener('visibilitychange', onVisibilityChange);
   window.addEventListener('focus', () => checkDayChange({ notify: true }));
-  renderAll();
+  setCurrentDate(currentDate);
 }
 
 function bindNavigation() {
@@ -175,11 +176,11 @@ function bindActions() {
     if (confirm('This will permanently delete all your data. Are you sure?')) {
       clearAllData();
       state = loadState();
+      initUI(state, getDateKey(), refresh);
       initDayTracking();
-      initUI(state, currentDate, refresh);
       syncDatePicker();
       scheduleMidnightRollover();
-      refresh();
+      setCurrentDate(currentDate);
       showToast('All data cleared', 'success');
     }
   });
